@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- Custom Base Styles & Fullscreen Aurora Background --- */
+body {
+  position: relative;
+  background-color: #111827; /* bg-gray-900 */
+  overflow-x: hidden; /* Prevents horizontal scrollbars from the large pseudo-elements */
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed; /* Use fixed positioning to cover the viewport */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  z-index: 0;
+  filter: blur(150px);
+  opacity: 0.15;
+  will-change: transform;
+}
+
+/* Larger, repositioned top-left aurora light */
+body::before {
+  width: 1200px;
+  height: 1200px;
+  background: radial-gradient(circle, rgba(29, 78, 216, 1) 0%, rgba(30, 64, 175, 0) 70%);
+  transform: translate(-80%, -80%);
+}
+
+/* Larger, repositioned bottom-right aurora light */
+body::after {
+  width: 1000px;
+  height: 1000px;
+  background: radial-gradient(circle, rgba(74, 222, 128, 1) 0%, rgba(34, 197, 94, 0) 70%);
+  transform: translate(60%, 70%);
+}
+
+/* Ensure all app content sits above the background */
+#root {
+  position: relative;
+  z-index: 1;
+  isolation: isolate; /* Creates a new stacking context */
+}
+
