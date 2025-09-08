@@ -120,7 +120,7 @@ const AddSubjectPage = ({ setPage, onSubjectAdded }) => {
 
         try {
             // This is still placeholder data. You will need to implement 
-            // a serverless function to handle the actual PDF parsing.
+            // a serverless function to handle the actual PDF parsing. (updated)
             const syllabus = {
                 examName: name,
                 topics: [
