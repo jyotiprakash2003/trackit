@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-// Removed: import pdfParse from 'pdf-parse'; // This cannot be run in the browser
+// Removed: import pdfParse from 'pdf-parse'; // This is a Node.js library and cannot be used in the browser.
 import { Renderer, Triangle, Program, Mesh } from 'ogl';
 
-// --- SUPABASE CLIENT SETUP ---
-// This part is crucial. Make sure your Vercel environment variables are correctly named.
+// --- SUPABASE CLIENT SETUP (WITH ROBUST CHECK) ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// This check will now reliably tell you if the variables are missing during deployment.
+// This will now cause a clear, readable error if the variables are not found in the Vercel environment.
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("CRITICAL ERROR: Supabase URL and/or Anon Key are missing from environment variables.");
+  throw new Error("CRITICAL ERROR: Your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are not configured correctly in your Vercel project settings.");
 }
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -301,7 +300,9 @@ const AddSubjectPage = ({ setPage, onSubjectAdded }) => {
     const handleFileChange = (e) => {
         if (e.target.files) setFile(e.target.files[0]);
     };
-
+    
+    // This function now needs to be a serverless function on Vercel.
+    // I've removed the complex parsing logic from here.
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!name || !examDate || !file) {
@@ -312,27 +313,23 @@ const AddSubjectPage = ({ setPage, onSubjectAdded }) => {
         setError('');
 
         try {
-            // STEP 1: Upload the file to a serverless function to be parsed.
-            // You will need to create a new file like `/api/parse-syllabus.js` in your Vercel project.
+            // In a real application, you would upload the file to a Vercel Serverless Function
+            // which would then parse it using pdf-parse and return the structured syllabus.
+            // For now, let's create a placeholder syllabus.
+            // TODO: Replace this with a call to your serverless function
+            const syllabus = {
+                examName: name,
+                topics: [
+                    { id: 't1', title: 'Placeholder Topic 1', topicWeightage: 50, subTopics: [
+                        { id: 'st1-1', title: 'Placeholder Sub-Topic 1.1', weightage: 25, completed: false },
+                        { id: 'st1-2', title: 'Placeholder Sub-Topic 1.2', weightage: 25, completed: false }
+                    ]},
+                    { id: 't2', title: 'Placeholder Topic 2', topicWeightage: 50, subTopics: [
+                        { id: 'st2-1', title: 'Placeholder Sub-Topic 2.1', weightage: 50, completed: false }
+                    ]}
+                ]
+            };
             
-            const formData = new FormData();
-            formData.append('syllabus', file);
-            formData.append('examName', name);
-
-            // Replace with your actual Vercel deployment URL
-            const response = await fetch('/api/parse-syllabus', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.message || 'Failed to parse syllabus.');
-            }
-
-            const syllabus = await response.json();
-
-            // STEP 2: Save the parsed data to Supabase.
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not found");
 
@@ -373,6 +370,7 @@ const AddSubjectPage = ({ setPage, onSubjectAdded }) => {
         </div>
     );
 };
+
 
 const TrackerPage = ({ subject: initialSubject, onUpdateSubject }) => {
     const [subject, setSubject] = useState(initialSubject);
