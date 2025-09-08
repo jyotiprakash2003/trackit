@@ -6,13 +6,13 @@
 body {
   position: relative;
   background-color: #111827; /* bg-gray-900 */
-  overflow-x: hidden; /* Prevents horizontal scrollbars from the large pseudo-elements */
+  overflow-x: hidden;
 }
 
 body::before,
 body::after {
   content: '';
-  position: fixed; /* Use fixed positioning to cover the viewport */
+  position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -23,7 +23,6 @@ body::after {
   will-change: transform;
 }
 
-/* Larger, repositioned top-left aurora light */
 body::before {
   width: 1200px;
   height: 1200px;
@@ -31,7 +30,6 @@ body::before {
   transform: translate(-80%, -80%);
 }
 
-/* Larger, repositioned bottom-right aurora light */
 body::after {
   width: 1000px;
   height: 1000px;
@@ -39,10 +37,17 @@ body::after {
   transform: translate(60%, 70%);
 }
 
-/* Ensure all app content sits above the background */
 #root {
   position: relative;
   z-index: 1;
   isolation: isolate; /* Creates a new stacking context */
+}
+
+/* --- Prism CSS (from Prism.css) --- */
+.prism-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
