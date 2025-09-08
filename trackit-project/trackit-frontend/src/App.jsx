@@ -1,211 +1,23 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Renderer, Triangle, Program, Mesh } from 'ogl';
 
 // --- SUPABASE CLIENT SETUP ---
 const supabaseUrl = 'https://ykptuwbyzwxjxbyigqmo.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcHR1d2J5end4anhieWlncW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyODUwNDgsImV4cCI6MjA3Mjg2MTA0OH0.viwkGUMYdNHDjCtjHx1pXLEi8hEYnxYS6a_8ViA5E-U';
 
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("CRITICAL ERROR: Supabase URL and Key are not configured correctly.");
+}
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 
-// --- PRISM BACKGROUND COMPONENT ---
-const Prism = ({
-  height = 3.5, baseWidth = 5.5, animationType = 'rotate', glow = 1,
-  offset = { x: 0, y: 0 }, noise = 0.5, transparent = true, scale = 3.6,
-  hueShift = 0, colorFrequency = 1, hoverStrength = 2, inertia = 0.05,
-  bloom = 1, suspendWhenOffscreen = false, timeScale = 0.5
-}) => {
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    
-    let onPointerMove, onLeave, onBlur, onMove;
-
-    const H = Math.max(0.001, height);
-    const BW = Math.max(0.001, baseWidth);
-    const BASE_HALF = BW * 0.5;
-    const GLOW = Math.max(0.0, glow);
-    const NOISE = Math.max(0.0, noise);
-    
-    // This is the corrected part that fixes the 'forEach' error
-    const offX = (offset && offset.x) || 0;
-    const offY = (offset && offset.y) || 0;
-    
-    const SAT = transparent ? 1.5 : 1;
-    const SCALE = Math.max(0.001, scale);
-    const HUE = hueShift || 0;
-    const CFREQ = Math.max(0.0, colorFrequency || 1);
-    const BLOOM = Math.max(0.0, bloom || 1);
-    const RSX = 1;
-    const RSY = 1;
-    const RSZ = 1;
-    const TS = Math.max(0, timeScale || 1);
-    const HOVSTR = Math.max(0, hoverStrength || 1);
-    const INERT = Math.max(0, Math.min(1, inertia || 0.12));
-
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const renderer = new Renderer({ dpr, alpha: transparent, antialias: false });
-    const gl = renderer.gl;
-    gl.disable(gl.DEPTH_TEST);
-    gl.disable(gl.CULL_FACE);
-    gl.disable(gl.BLEND);
-
-    Object.assign(gl.canvas.style, {
-      position: 'absolute', inset: '0', width: '100%',
-      height: '100%', display: 'block'
-    });
-    container.appendChild(gl.canvas);
-
-    const vertex = `attribute vec2 position; void main() { gl_Position = vec4(position, 0.0, 1.0); }`;
-    const fragment = `precision highp float;
-      uniform vec2 iResolution; uniform float iTime;
-      uniform float uHeight; uniform float uBaseHalf; uniform mat3 uRot;
-      uniform int uUseBaseWobble; uniform float uGlow; uniform vec2 uOffsetPx;
-      uniform float uNoise; uniform float uSaturation; uniform float uScale;
-      uniform float uHueShift; uniform float uColorFreq; uniform float uBloom;
-      uniform float uCenterShift; uniform float uInvBaseHalf; uniform float uInvHeight;
-      uniform float uMinAxis; uniform float uPxScale; uniform float uTimeScale;
-
-      vec4 tanh4(vec4 x){ vec4 e2x = exp(2.0*x); return (e2x - 1.0) / (e2x + 1.0); }
-      float rand(vec2 co){ return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
-      float sdOctaAnisoInv(vec3 p){
-        vec3 q = vec3(abs(p.x) * uInvBaseHalf, abs(p.y) * uInvHeight, abs(p.z) * uInvBaseHalf);
-        return (q.x + q.y + q.z - 1.0) * uMinAxis * 0.57735;
-      }
-      float sdPyramidUpInv(vec3 p){ return max(sdOctaAnisoInv(p), -p.y); }
-      mat3 hueRotation(float a){
-        float c = cos(a), s = sin(a);
-        mat3 W = mat3(0.299, 0.587, 0.114, 0.299, 0.587, 0.114, 0.299, 0.587, 0.114);
-        mat3 U = mat3(0.701, -0.587, -0.114, -0.299, 0.413, -0.114, -0.300, -0.588, 0.886);
-        mat3 V = mat3(0.168, -0.331, 0.500, 0.328, 0.035, -0.500, -0.497, 0.296, 0.201);
-        return W + U * c + V * s;
-      }
-      void main(){
-        vec2 f = (gl_FragCoord.xy - 0.5 * iResolution.xy - uOffsetPx) * uPxScale;
-        float z = 5.0, d; vec3 p; vec4 o = vec4(0.0);
-        mat2 wob = mat2(1.0);
-        if (uUseBaseWobble == 1) {
-          float t = iTime * uTimeScale;
-          wob = mat2(cos(t), sin(t), -sin(t), cos(t));
-        }
-        for (int i = 0; i < 100; i++) {
-          p = vec3(f, z); p.xz = p.xz * wob; p = uRot * p;
-          vec3 q = p; q.y += uCenterShift;
-          d = 0.1 + 0.2 * abs(sdPyramidUpInv(q));
-          z -= d;
-          o += (sin((p.y + z) * uColorFreq + vec4(0.0, 1.0, 2.0, 3.0)) + 1.0) / d;
-        }
-        o = tanh4(o * o * (uGlow * uBloom) / 1e5);
-        vec3 col = o.rgb;
-        col += (rand(gl_FragCoord.xy + iTime) - 0.5) * uNoise;
-        col = clamp(col, 0.0, 1.0);
-        float L = dot(col, vec3(0.2126, 0.7152, 0.0722));
-        col = clamp(mix(vec3(L), col, uSaturation), 0.0, 1.0);
-        if(abs(uHueShift) > 0.0001){ col = clamp(hueRotation(uHueShift) * col, 0.0, 1.0); }
-        gl_FragColor = vec4(col, o.a);
-      }`;
-
-    const geometry = new Triangle(gl);
-    const iResBuf = new Float32Array(2);
-    const offsetPxBuf = new Float32Array(2);
-    const program = new Program(gl, { vertex, fragment, uniforms: {
-      iResolution: { value: iResBuf }, iTime: { value: 0 },
-      uHeight: { value: H }, uBaseHalf: { value: BASE_HALF },
-      uUseBaseWobble: { value: 1 }, uRot: { value: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]) },
-      uGlow: { value: GLOW }, uOffsetPx: { value: offsetPxBuf }, uNoise: { value: NOISE },
-      uSaturation: { value: SAT }, uScale: { value: SCALE }, uHueShift: { value: HUE },
-      uColorFreq: { value: CFREQ }, uBloom: { value: BLOOM }, uCenterShift: { value: H * 0.25 },
-      uInvBaseHalf: { value: 1 / BASE_HALF }, uInvHeight: { value: 1 / H },
-      uMinAxis: { value: Math.min(BASE_HALF, H) },
-      uPxScale: { value: 1 / ((gl.drawingBufferHeight || 1) * 0.1 * SCALE) },
-      uTimeScale: { value: TS }
-    }});
-    const mesh = new Mesh(gl, { geometry, program });
-
-    const resize = () => {
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      iResBuf[0] = gl.drawingBufferWidth; iResBuf[1] = gl.drawingBufferHeight;
-      offsetPxBuf[0] = offX * dpr; offsetPxBuf[1] = offY * dpr;
-      program.uniforms.uPxScale.value = 1 / (gl.drawingBufferHeight * 0.1 * SCALE);
-    };
-    const ro = new ResizeObserver(resize); ro.observe(container); resize();
-
-    const rotBuf = new Float32Array(9);
-    const setMat3FromEuler = (yawY, pitchX, rollZ, out) => {
-      const cy = Math.cos(yawY), sy = Math.sin(yawY), cx = Math.cos(pitchX), sx = Math.sin(pitchX), cz = Math.cos(rollZ), sz = Math.sin(rollZ);
-      out[0]=cy*cz+sy*sx*sz; out[1]=cx*sz; out[2]=-sy*cz+cy*sx*sz;
-      out[3]=-cy*sz+sy*sx*cz; out[4]=cx*cz; out[5]=sy*sz+cy*sx*cz;
-      out[6]=sy*cx; out[7]=-sx; out[8]=cy*cx;
-      return out;
-    };
-
-    let raf = 0; const t0 = performance.now();
-    const startRAF = () => { if (!raf) raf = requestAnimationFrame(render); };
-    const stopRAF = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
-
-    const rnd = Math.random; const wX = (0.3+rnd()*0.6)*RSX; const wY = (0.2+rnd()*0.7)*RSY; const wZ = (0.1+rnd()*0.5)*RSZ;
-    const phX = rnd()*Math.PI*2; const phZ = rnd()*Math.PI*2;
-    let yaw=0, pitch=0, roll=0; let targetYaw=0, targetPitch=0;
-    const lerp = (a, b, t) => a + (b - a) * t;
-    const pointer = { x: 0, y: 0, inside: true };
-    
-    if (animationType === 'hover') {
-      onMove = (e) => {
-        const ww = window.innerWidth, wh = window.innerHeight;
-        pointer.x = (e.clientX - ww*0.5)/(ww*0.5); pointer.y = (e.clientY-wh*0.5)/(wh*0.5); pointer.inside = true;
-        startRAF();
-      };
-      onLeave = () => { pointer.inside = false; };
-      onBlur = () => { pointer.inside = false; };
-      window.addEventListener('pointermove', onMove, { passive: true }); window.addEventListener('mouseleave', onLeave); window.addEventListener('blur', onBlur);
-      program.uniforms.uUseBaseWobble.value = 0;
-    } else { program.uniforms.uUseBaseWobble.value = animationType === 'rotate' ? 1 : 0; }
-
-    const render = (t) => {
-      const time = (t - t0) * 0.001;
-      program.uniforms.iTime.value = time;
-      let continueRAF = true;
-      if (animationType === 'hover') {
-        targetYaw = (pointer.inside ? -pointer.x : 0) * 0.6 * HOVSTR; targetPitch = (pointer.inside ? pointer.y : 0) * 0.6 * HOVSTR;
-        yaw = lerp(yaw, targetYaw, INERT); pitch = lerp(pitch, targetPitch, INERT); roll = lerp(roll, 0, 0.1);
-        if (NOISE < 1e-6 && Math.abs(yaw-targetYaw)<1e-4 && Math.abs(pitch-targetPitch)<1e-4) continueRAF=false;
-      } else if (animationType === '3drotate') {
-        const tScaled = time * TS;
-        yaw = tScaled * wY; pitch = Math.sin(tScaled * wX + phX) * 0.6; roll = Math.sin(tScaled * wZ + phZ) * 0.5;
-        if (TS < 1e-6) continueRAF = false;
-      } else { if (TS < 1e-6) continueRAF = false; }
-      program.uniforms.uRot.value = setMat3FromEuler(yaw, pitch, roll, rotBuf);
-      renderer.render({ scene: mesh });
-      if (continueRAF) raf = requestAnimationFrame(render); else raf = 0;
-    };
-    if (suspendWhenOffscreen) {
-      const io = new IntersectionObserver(e=>e[0].isIntersecting ? startRAF() : stopRAF()); io.observe(container);
-      container.__prismIO = io;
-    } else { startRAF(); }
-
-    return () => {
-      stopRAF(); ro.disconnect();
-      if(onMove) window.removeEventListener('pointermove', onMove);
-      if(onLeave) window.removeEventListener('mouseleave', onLeave);
-      if(onBlur) window.removeEventListener('blur', onBlur);
-      if (container.__prismIO) container.__prismIO.disconnect();
-      if (gl.canvas.parentElement === container) container.removeChild(gl.canvas);
-    };
-  }, [height, baseWidth, animationType, glow, noise, offset, scale, transparent, hueShift, colorFrequency, timeScale, hoverStrength, inertia, bloom, suspendWhenOffscreen]);
-
-  return <div className="prism-container" ref={containerRef} />;
-};
-
-
-// --- ICONS (No changes needed) ---
+// --- ICONS ---
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
 const BookIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20v-2H6.5A2.5 2.5 0 0 1 4 12.5v-5A2.5 2.5 0 0 1 6.5 5H20V3H6.5A2.5 2.5 0 0 1 4 5.5v14z"></path></svg>;
 const CheckIcon = () => <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4 text-green-300"><path d="M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z" /></svg>;
 const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
 const SignOutIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>;
+
 
 // --- PAGE COMPONENTS ---
 
@@ -232,9 +44,7 @@ const AuthPage = () => {
 
     return (
         <div className="w-full h-screen flex items-center justify-center bg-gray-900">
-             <div className="absolute inset-0 z-0">
-                 <Prism animationType="3drotate" bloom={0.5} glow={1} />
-            </div>
+            {/* The Prism component was here and has been removed */}
             <div className="relative z-10 w-full max-w-sm mx-auto p-8 bg-gray-800/50 backdrop-blur-lg rounded-2xl border border-gray-700">
                 <h1 className="text-4xl font-bold text-white mb-6 text-center">TrackIT</h1>
                 <form onSubmit={handleAuth} className="space-y-6">
@@ -287,7 +97,6 @@ const DashboardPage = ({ setPage, subjects, setActiveSubjectId, signOut, deleteS
     </div>
 );
 
-// --- MODIFIED AddSubjectPage ---
 const AddSubjectPage = ({ setPage, onSubjectAdded }) => {
     const [name, setName] = useState('');
     const [faculty, setFaculty] = useState('');
@@ -310,6 +119,8 @@ const AddSubjectPage = ({ setPage, onSubjectAdded }) => {
         setError('');
 
         try {
+            // This is still placeholder data. You will need to implement 
+            // a serverless function to handle the actual PDF parsing.
             const syllabus = {
                 examName: name,
                 topics: [
