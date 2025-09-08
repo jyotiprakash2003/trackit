@@ -6,10 +6,8 @@ import { Renderer, Triangle, Program, Mesh } from 'ogl';
 const supabaseUrl = 'https://ykptuwbyzwxjxbyigqmo.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcHR1d2J5end4anhieWlncW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyODUwNDgsImV4cCI6MjA3Mjg2MTA0OH0.viwkGUMYdNHDjCtjHx1pXLEi8hEYnxYS6a_8ViA5E-U';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("CRITICAL ERROR: Supabase URL and Key are not configured correctly.");
-}
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 
 // --- PRISM BACKGROUND COMPONENT ---
 const Prism = ({
@@ -32,10 +30,9 @@ const Prism = ({
     const GLOW = Math.max(0.0, glow);
     const NOISE = Math.max(0.0, noise);
     
-    // --- FIX APPLIED HERE ---
+    // This is the corrected part that fixes the 'forEach' error
     const offX = (offset && offset.x) || 0;
     const offY = (offset && offset.y) || 0;
-    // --- END OF FIX ---
     
     const SAT = transparent ? 1.5 : 1;
     const SCALE = Math.max(0.001, scale);
