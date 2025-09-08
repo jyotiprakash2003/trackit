@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { Renderer, Triangle, Program, Mesh } from 'ogl';
 
 // --- SUPABASE CLIENT SETUP (WITH ROBUST CHECK) ---
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = 'https://ykptuwbyzwxjxbyigqmo.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcHR1d2J5end4anhieWlncW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyODUwNDgsImV4cCI6MjA3Mjg2MTA0OH0.viwkGUMYdNHDjCtjHx1pXLEi8hEYnxYS6a_8ViA5E-U';
 
 // This will now cause a clear, readable error if the variables are not found in the Vercel environment.
 if (!supabaseUrl || !supabaseAnonKey) {
